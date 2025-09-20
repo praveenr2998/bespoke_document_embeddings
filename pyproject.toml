@@ -1,0 +1,11 @@
+[project]
+name = "bespoke-document-embeddings"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "docling>=2.53.0",
+    "docling-core>=2.48.1",
+    "transformers>=4.56.2",
+]
