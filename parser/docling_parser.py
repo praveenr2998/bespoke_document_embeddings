@@ -1,9 +1,13 @@
-from docling.document_converter import DocumentConverter
-from typing import Literal, Any
 import json
+from typing import Any, Literal
+
+from docling.document_converter import DocumentConverter
+
 
 class PDFParser:
-    def __init__(self, pdf_path: str, output_path: str, output_type: Literal["json", "markdown"]):
+    def __init__(
+        self, pdf_path: str, output_path: str, output_type: Literal["json", "markdown"]
+    ):
         self.pdf_path = pdf_path
         self.output_path = output_path
         self.output_type = output_type
@@ -49,11 +53,11 @@ class PDFParser:
         """
         doc = self.parse()
         if self.output_type == "json":
-            with open(f"{self.output_path}/parsed_output.json", "w", encoding="utf-8") as f:
+            with open(
+                f"{self.output_path}/parsed_output.json", "w", encoding="utf-8"
+            ) as f:
                 json.dump(doc.export_to_dict(), f, ensure_ascii=False, indent=4)
         elif self.output_type == "markdown":
             raise NotImplemented("Markdown yet to be implemented")
         else:
             raise ValueError("Invalid output type")
-
-
