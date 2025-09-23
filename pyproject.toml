@@ -7,5 +7,6 @@ requires-python = ">=3.13"
 dependencies = [
     "docling>=2.53.0",
     "docling-core>=2.48.1",
+    "python-dotenv>=1.1.1",
     "transformers>=4.56.2",
 ]
