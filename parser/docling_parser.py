@@ -1,10 +1,10 @@
 import json
-from typing import Any, Literal
 import os
-from dotenv import load_dotenv
-from huggingface_hub import login
+from typing import Any, Literal
 
 from docling.document_converter import DocumentConverter
+from dotenv import load_dotenv
+from huggingface_hub import login
 from transformers import AutoTokenizer
 
 load_dotenv()
