@@ -1,10 +1,10 @@
 import json
-from typing import Any, Literal
 import os
-from dotenv import load_dotenv
-from huggingface_hub import login
+from typing import Any, Literal
 
 from docling.document_converter import DocumentConverter
+from dotenv import load_dotenv
+from huggingface_hub import login
 from transformers import AutoTokenizer
 
 load_dotenv()
@@ -43,14 +43,15 @@ class PDFParser:
         parsed_dict = self.get_parsed_json(doc)
         texts = parsed_dict.get("texts", [])
         for text in texts:
-            if text.get("label") == "section_header":
+            if text.get("label", "") == "section_header":
                 prov = text.get("prov", [])
                 if prov:
                     start_page = None
                     for p in prov:
                         start_page = p.get("page_no")
                         break
-                    table_of_contents[text.get("text")] = {
+                    title = text.get("text") + "~" + str(start_page)
+                    table_of_contents[title] = {
                         "start_page": start_page,
                         "text_contents": [],
                     }
@@ -85,11 +86,12 @@ class PDFParser:
         cur_page_header = None
         for text in parsed_dict.get("texts", []):
             if text.get("label", "") == "section_header":
-                cur_page_header = text.get("text")
+                cur_page_header = text.get("text") + "~" + str(text.get("prov", [{}])[0].get("page_no"))
             if (
                 cur_page_header is not None
                 and text.get("label", "") != "section_header"
                 and text.get("text", "") != ""
+                and text.get("text", "") != "footnote"
             ):
                 table_of_contents[cur_page_header]["text_contents"].append(
                     text.get("text")
@@ -162,10 +164,12 @@ class PDFParser:
                 json.dump(
                     self.get_table_of_contents(doc), f, ensure_ascii=False, indent=4
                 )
+
             with open(
                 f"{self.output_path}/parsed_output.json", "w", encoding="utf-8"
             ) as f:
                 json.dump(self.get_parsed_json(doc), f, ensure_ascii=False, indent=4)
+
             with open(
                 f"{self.output_path}/consolidated_parsed_output.json",
                 "w",
