@@ -1,6 +1,6 @@
 # Bespoke Document Embeddings
 
-A document processing and question generation system that parses PDF documents and generates contextual questions using locally served LLM models via vLLM.
+A document processing and question generation system that parses PDF documents and generates contextual questions using locally served LLM models via vLLM. And uses the generated questions to fine-tune the embedding/bi-encoder model to generate more contextual embeddings.
 
 ## Features
 
