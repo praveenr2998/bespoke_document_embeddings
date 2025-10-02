@@ -94,7 +94,7 @@ class GenerateQuestions:
             desc="Retrying failed question generation",
         ):
             text_with_questions = content.get("text_with_questions", [])
-            for idx in len(text_with_questions):
+            for idx in range(len(text_with_questions)):
                 if not text_with_questions[idx].get("questions"):
                     text_content = text_with_questions[idx].get("text_content")
                     raw_llm_response = get_llm_response(content=text_content)
