@@ -19,6 +19,7 @@ class BiEncoderTrainer:
         self.device = "cuda" if torch.cuda.is_available() else "cpu"
         self.collection = chroma_client.get_or_create_collection(name="doc_embeddings")
         self.model = SentenceTransformer(os.getenv("BI_ENCODER_MODEL_NAME"), cache_folder=os.getenv("CACHE_DIR")).to(device=self.device)
+        self.trained_model = None
 
 
     def embed_text(self, sentence: str):
@@ -98,9 +99,27 @@ class BiEncoderTrainer:
                 loss=loss,
             )
             trainer.train()
+            
+            # Save complete model
+            trainer.save_model()
+            print(f"Model saved to: {args.output_dir}")
 
+    def load_trained_model(self, model_path="models/finetuned_bi_encoder"):
+        self.trained_model = SentenceTransformer(model_path, device=self.device)
+        print(f"Successfully loaded trained model from {model_path}")
+
+    def upload_to_huggingface(self, repo_name, model_path="models/finetuned_bi_encoder", private=False):
+            self.load_trained_model(model_path)
+            
+            # Push to hub
+            self.trained_model.push_to_hub(
+                repo_name,
+                private=private,
+                commit_message="Upload fine-tuned bi-encoder model"
+            )
 
 obj = BiEncoderTrainer()
 obj.upload_embeddings()
 obj.prepare_training_data()
 obj.train()
+obj.upload_to_huggingface(repo_name="praveenramesh/awq_finetuned_embedding_gemma")
