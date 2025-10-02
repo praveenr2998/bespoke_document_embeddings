@@ -1,6 +1,8 @@
 import json
+import os
 from parser.docling_parser import PDFParser
 
+from model_trainer.trainer import BiEncoderTrainer
 from question_generator.generate_questions import GenerateQuestions
 
 if __name__ == "__main__":
@@ -26,5 +28,16 @@ if __name__ == "__main__":
             ensure_ascii=False,
             indent=4,
         )
+
+    vllm_switched_off = input(
+        "Terminate vllm manually, after killing it confirm by typing 'yes' : "
+    )
+    if vllm_switched_off.lower() == "yes":
+        bi_encoder_trainer = BiEncoderTrainer()
+        bi_encoder_trainer.upload_embeddings()
+        bi_encoder_trainer.prepare_training_data()
+        bi_encoder_trainer.train()
+        if os.getenv("HF_REPO_NAME"):
+            bi_encoder_trainer.upload_to_huggingface(os.getenv("HF_REPO_NAME"))
 
 # vllm serve meta-llama/Llama-3.2-3B-Instruct --max-model-len 3000 --max-num-batched-tokens 3000 --dtype auto --api-key praveen@123
