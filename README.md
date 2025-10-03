@@ -105,7 +105,7 @@ Execute the main script to process a PDF and generate questions:
 python main.py
 ```
 
-!!! Note : It is recommended to run in a GPU enabled instance, when executing main.py post creation of training data user will be prompted with "Terminate vllm manually, after killing it confirm by typing 'yes' : ", kill the vLLM server and confirm by typing 'yes' to continue to model training
+**!!! Note : It is recommended to run in a GPU enabled instance, when executing main.py post creation of training data user will be prompted with "Terminate vllm manually, after killing it confirm by typing 'yes' : ", kill the vLLM server and confirm by typing 'yes' to continue to model training**
 
 ## Components
 
