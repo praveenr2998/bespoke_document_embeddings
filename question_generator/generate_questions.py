@@ -49,6 +49,10 @@ class GenerateQuestions:
             return None
 
     def generate_questions(self):
+        """
+        Generate questions for each text content in the parsed content.
+        :return:
+        """
         parsed_content_with_questions = {}
         for title, content in tqdm(
             self.parsed_content.items(), desc="Generating questions"
@@ -77,4 +81,60 @@ class GenerateQuestions:
                     parsed_content_with_questions[title]["text_with_questions"].append(
                         {"text_content": text_content}
                     )
+        return parsed_content_with_questions
+
+    def retry_failed_question_generation(self, parsed_content_with_questions: dict):
+        """
+        Retry failed question generation for each text content in the parsed content.
+        :param parsed_content_with_questions: parsed content with LLM generated questions
+        :return:
+        """
+        for title, content in tqdm(
+            parsed_content_with_questions.items(),
+            desc="Retrying failed question generation",
+        ):
+            text_with_questions = content.get("text_with_questions", [])
+            for idx in range(len(text_with_questions)):
+                if not text_with_questions[idx].get("questions"):
+                    text_content = text_with_questions[idx].get("text_content")
+                    raw_llm_response = get_llm_response(content=text_content)
+                    structured_llm_response = self.extract_dict_from_text(
+                        text_with_json=raw_llm_response
+                    )
+                    if structured_llm_response is not None:
+                        questions = structured_llm_response.get("questions", [])
+                        if questions:
+                            parsed_content_with_questions[title]["text_with_questions"][
+                                idx
+                            ]["questions"] = questions
+        return parsed_content_with_questions
+
+    @staticmethod
+    def check_question_generation_completion(parsed_content_with_questions: dict):
+        """
+        used to check if all questions are generated for each text content in the parsed content.
+        :param parsed_content_with_questions:
+        :return:
+        """
+        for title, content in parsed_content_with_questions.items():
+            text_with_questions = content.get("text_with_questions", [])
+            for text_content in text_with_questions:
+                if not text_content.get("questions"):
+                    return False
+        return True
+
+    def orchestrate_questions_generation(self):
+        """
+        Orchestrates the questions generation process.
+        :return:
+        """
+        parsed_content_with_questions = self.generate_questions()
+        retry_count = 0
+        while retry_count < 3:
+            if self.check_question_generation_completion(parsed_content_with_questions):
+                break
+            parsed_content_with_questions = self.retry_failed_question_generation(
+                parsed_content_with_questions
+            )
+            retry_count += 1
         return parsed_content_with_questions
