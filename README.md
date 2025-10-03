@@ -1,33 +1,42 @@
 # Bespoke Document Embeddings
 
-A document processing and question generation system that parses PDF documents and generates contextual questions using locally served LLM models via vLLM. And uses the generated questions to fine-tune the embedding/bi-encoder model to generate more contextual embeddings.
-
-## Features
-
-- **PDF Document Parsing**: Uses Docling to extract structured content from PDF documents
-- **Intelligent Text Consolidation**: Groups content by sections/headers with token-aware chunking
-- **Question Generation**: Generates 5 contextual questions per text chunk using LLM
-- **Local LLM Integration**: Communicates with vLLM-served models via OpenAI-compatible API
-- **Token Management**: Automatically adjusts content chunks based on model's context window
+The motivation behind this project is to adapt pre-trained bi-encoder models to generate more contextual embeddings for a given document.
 
 ## Project Structure
-
 ```
 bespoke_document_embeddings/
-├── parser/
+├── parser/                      # Document parsing module
 │   ├── data/                    # Input PDF files
+│   │   └── AWQ.pdf
+│   ├── input/                   # Additional input directory
 │   ├── output/                  # Parsed JSON outputs
-│   └── docling_parser.py        # PDF parsing logic
-├── question_generator/
+│   │   ├── consolidated_parsed_output.json
+│   │   ├── parsed_output.json
+│   │   ├── table_of_contents.json
+│   │   └── tokenizer_adjusted_parsed_output.json
+│   └── docling_parser.py        # PDF parsing using Docling
+│
+├── question_generator/          # Question generation module
 │   ├── output/                  # Generated questions output
-│   ├── generate_questions.py    # Question generation logic
-│   ├── llm_utils.py            # LLM communication utilities
+│   │   └── parsed_content_with_questions.json
+│   ├── generate_questions.py    # Main question generation logic
+│   ├── llm_utils.py            # LLM utility functions
 │   └── prompts.py              # System and user prompts
-├── models/                     # Cached model files
-├── main.py                     # Main execution script
-├── pyproject.toml              # Project dependencies
-└── README.md                   # This file
+│
+├── model_trainer/              # Model training and fine-tuning
+│   ├── training_data/          # Training datasets
+│   └── trainer.py              # BiEncoder model trainer
+│
+├── models/                     # Model storage and management
+├── db/                         # Vector database storage
+├── main.py                     # Main application entry point
+├── pyproject.toml             # Project dependencies and configuration
+└── uv.lock                    # Dependency lock file
 ```
+
+## Architecture
+
+![Architecture Diagram](media/architecture.png)
 
 ## Prerequisites
 
@@ -54,12 +63,20 @@ bespoke_document_embeddings/
    ```
    
    Edit `.env` and add your configuration:
-   ```env
-   HF_TOKEN=your_huggingface_token
-   BI_ENCODER_MODEL_NAME=your_encoder_model_name
-   CACHE_DIR=./models
-   CONTEXT_WINDOW=3000
+   ```bash
+   export HF_TOKEN=your_token
+   export BI_ENCODER_MODEL_NAME=google/embeddinggemma-300m
+   export CONTEXT_WINDOW=2000
+   export CACHE_DIR=models
+   export VLLM_CACHE_ROOT=models
+   export TRAINED_MODEL_SAVE_DIR=models/finetuned_bi_encoder
+   export HF_REPO_NAME=praveenramesh/awq_finetuned_embedding_gemma
+    ```
+4. **Activate virtual environment**:
+   ```bash
+   source .venv/bin/activate
    ```
+   Activate virtual environment in two terminals, one for starting the vLLM server and another one for executing main.py
 
 ## Usage
 
@@ -71,41 +88,6 @@ First, start the vLLM server with Llama model:
 vllm serve meta-llama/Llama-3.2-3B-Instruct --max-model-len 3000 --max-num-batched-tokens 3000 --dtype auto --api-key praveen@123
 ```
 
-### 2. Run the Pipeline
-
-Execute the main script to process a PDF and generate questions:
-
-```bash
-python main.py
-```
-
-This will:
-1. Parse the PDF document (`parser/data/AWQ.pdf`)
-2. Extract and consolidate text content by sections
-3. Generate questions for each text chunk
-4. Save results to `question_generator/output/parsed_content_with_questions.json`
-
-### 3. Output Files
-
-The pipeline generates several output files:
-
-- `parser/output/table_of_contents.json` - Document structure with page numbers
-- `parser/output/parsed_output.json` - Raw parsed document data
-- `parser/output/consolidated_parsed_output.json` - Text consolidated by sections
-- `parser/output/tokenizer_adjusted_parsed_output.json` - Token-aware chunked content
-- `question_generator/output/parsed_content_with_questions.json` - Final output with questions
-
-## Configuration
-
-### Environment Variables
-
-| Variable | Description | Example |
-|----------|-------------|---------|
-| `HF_TOKEN` | Hugging Face authentication token | `hf_xxxxx` |
-| `BI_ENCODER_MODEL_NAME` | Model name for tokenizer | `google/embeddinggemma-300m` |
-| `CACHE_DIR` | Directory for cached models | `./models` |
-| `CONTEXT_WINDOW` | Maximum tokens per chunk | `3000` |
-
 ### vLLM Server Configuration
 
 The system expects a vLLM server running on `http://localhost:8000` with:
@@ -114,49 +96,91 @@ The system expects a vLLM server running on `http://localhost:8000` with:
 - Max model length: 3000 tokens
 - Max batched tokens: 3000
 
+
+### 2. Run the Pipeline
+
+Execute the main script to process a PDF and generate questions:
+
+```bash
+python main.py
+```
+
+!!! Note : It is recommended to run in a GPU enabled instance, when executing main.py post creation of training data user will be prompted with "Terminate vllm manually, after killing it confirm by typing 'yes' : ", kill the vLLM server and confirm by typing 'yes' to continue to model training
+
 ## Components
 
-### PDFParser (`parser/docling_parser.py`)
+The system consists of four main components that work together to create bespoke document embeddings:
 
-Handles PDF document processing with the following capabilities:
-- Document conversion using Docling
-- Table of contents extraction
-- Text consolidation by sections
-- Token-aware content chunking
-- Multiple output formats (JSON, Markdown)
+### 1. PDF Parser (`parser/docling_parser.py`)
 
-### GenerateQuestions (`question_generator/generate_questions.py`)
+**Purpose**: Converts PDF documents into structured, tokenizer-aware text chunks using Docling.
 
-Generates contextual questions from parsed content:
-- Processes each text chunk individually
-- Extracts structured JSON responses from LLM
-- Handles malformed responses gracefully
-- Progress tracking with tqdm
+**Key Features**:
+- Extracts structured content with section headers and page numbers
+- Consolidates text by sections/headers
+- Implements token-aware chunking based on model's context window
+- Generates multiple output formats for downstream processing
 
-### LLM Utils (`question_generator/llm_utils.py`)
+**Sample Input**:
+```
+PDF file: parser/data/AWQ.pdf
+Context window: 2000 tokens
+Model: google/embeddinggemma-300m
+```
 
-Manages communication with the vLLM server:
-- OpenAI-compatible API client
-- Configurable model and parameters
-- System and user prompt handling
-
-## Example Output
-
-The final output contains structured data like:
-
+**Sample Output**:
 ```json
 {
-  "Section Title": {
+  "ABSTRACT~1": {
+    "start_page": 1,
+    "text_contents": [
+      "Large language models (LLMs) have transformed numerous AI applications. On-device LLM is becoming increasingly important: running LLMs locally on edge devices can reduce the cloud computing cost and protect users' privacy..."
+    ]
+  },
+  "1 INTRODUCTION~1": {
+    "start_page": 1,
+    "text_contents": [
+      "Deploying large language models (LLMs) directly on edge devices is crucial. On-device usage eliminates delays caused by sending data to a cloud server..."
+    ]
+  }
+}
+```
+
+**Generated Files**:
+- `table_of_contents.json` - Section headers with page numbers
+- `parsed_output.json` - Raw Docling output
+- `consolidated_parsed_output.json` - Text consolidated by sections
+- `tokenizer_adjusted_parsed_output.json` - Token-aware chunked content
+
+### 2. Question Generator (`question_generator/generate_questions.py`)
+
+**Purpose**: Generates contextual questions from parsed document content using a locally served vLLM model.
+
+**Key Features**:
+- Uses Llama-3.2-3B-Instruct model via OpenAI-compatible API
+- Generates multiple questions per text chunk
+- Implements retry logic for failed generations
+- Extracts structured JSON responses from LLM output
+
+**Sample Input**:
+```json
+{
+  "text_content": "Large language models (LLMs) have transformed numerous AI applications. AWQ finds that not all weights in an LLM are equally important. Protecting only 1% salient weights can greatly reduce quantization error."
+}
+```
+
+**Sample Output**:
+```json
+{
+  "ABSTRACT~1": {
     "start_page": 1,
     "text_with_questions": [
       {
-        "text_content": "Your document content here...",
+        "text_content": "Large language models (LLMs) have transformed numerous AI applications...",
         "questions": [
-          "What is the main concept discussed?",
-          "How does this relate to the broader topic?",
-          "What are the key findings?",
-          "What methodology was used?",
-          "What are the implications?"
+          "What is the main goal of the proposed Activation-aware Weight Quantization (AWQ) approach?",
+          "How does AWQ identify salient weight channels in a Large Language Model (LLM)?",
+          "What is the benefit of using AWQ in terms of quantization error reduction?"
         ]
       }
     ]
@@ -164,36 +188,85 @@ The final output contains structured data like:
 }
 ```
 
-## Dependencies
+**Dependencies**:
+- vLLM server running on `http://localhost:8000`
+- Model: `meta-llama/Llama-3.2-3B-Instruct`
+- API Key: `praveen@123`
 
-- **docling**: PDF document processing
-- **transformers**: Tokenizer for content chunking
-- **openai**: LLM API communication
-- **vllm**: Local model serving
-- **python-dotenv**: Environment variable management
-- **tqdm**: Progress tracking
+### 3. Model Trainer (`model_trainer/trainer.py`)
 
-## Contributing
+**Purpose**: Fine-tunes bi-encoder models using question-document pairs with contrastive learning.
 
-1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Add tests if applicable
-5. Submit a pull request
+**Key Features**:
+- Uses ChromaDB for vector storage and similarity search
+- Implements Multiple Negatives Ranking Loss
+- Generates training triplets (anchor question, positive document, negative documents)
+- Supports model upload to Hugging Face Hub
 
-## License
+**Training Process**:
+1. **Embedding Generation**: Creates embeddings for all document chunks
+2. **Training Data Preparation**: 
+   - For each question, finds similar documents as negatives
+   - Creates triplets: `{anchor: question, positive: source_text, negative: similar_text}`
+3. **Model Fine-tuning**: Uses SentenceTransformer with contrastive loss
 
-[Add your license information here]
+**Sample Training Data**:
+```json
+[
+  {
+    "anchor": "What is the main goal of AWQ?",
+    "positive": "AWQ finds that not all weights in an LLM are equally important. Protecting only 1% salient weights can greatly reduce quantization error.",
+    "negative": "Large language models have transformed numerous AI applications. On-device LLM is becoming increasingly important for privacy."
+  }
+]
+```
 
-## Troubleshooting
+**Training Configuration**:
+- Base model: `google/embeddinggemma-300m`
+- Training epochs: 5
+- Batch size: 1
+- Learning rate: 2e-5
+- Loss function: MultipleNegativesRankingLoss
 
-### Common Issues
+**Output**: Fine-tuned model saved to `models/finetuned_bi_encoder/`
 
-1. **vLLM Server Not Running**: Ensure the vLLM server is started before running the pipeline
-2. **Token Limit Exceeded**: Adjust `CONTEXT_WINDOW` in environment variables
-3. **Model Not Found**: Verify model name and Hugging Face token
-4. **JSON Parsing Errors**: Check LLM responses in logs for malformed JSON
+### 4. Vector Database (`ChromaDB`)
 
-### Support
+**Purpose**: Stores document embeddings and enables similarity search for training data generation.
 
-For issues and questions, please open an issue in the repository.
+**Key Features**:
+- Persistent storage in `db/` directory
+- Efficient similarity search for negative sampling
+- Metadata storage for document sections and page numbers
+
+**Sample Database Entry**:
+```json
+{
+  "id": "uuid-string",
+  "document": "AWQ finds that not all weights in an LLM are equally important...",
+  "embedding": [0.1, -0.2, 0.3, ...],
+  "metadata": {
+    "title": "ABSTRACT~1"
+  }
+}
+```
+
+### Component Interaction Flow
+
+```
+PDF Document → PDFParser → Structured JSON
+     ↓
+Structured JSON → QuestionGenerator → Questions + Text Pairs
+     ↓
+Questions + Text → BiEncoderTrainer → Training Data Triplets
+     ↓
+Training Triplets → Fine-tuning → Bespoke Embeddings Model
+```
+
+### Integration Points
+
+- **Parser → Question Generator**: `tokenizer_adjusted_parsed_output.json`
+- **Question Generator → Model Trainer**: `parsed_content_with_questions.json`
+- **Model Trainer → ChromaDB**: Embeddings and similarity search
+- **Model Trainer → HuggingFace**: Fine-tuned model upload
+
