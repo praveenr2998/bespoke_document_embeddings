@@ -28,7 +28,6 @@ class GenerateQuestions:
             None if the string is not valid JSON.
         """
         try:
-            # First, try to extract JSON from markdown code blocks
             json_match = re.search(
                 r"```(?:json)?\s*\n(.*?)\n```", text_with_json, re.DOTALL
             )
@@ -38,13 +37,11 @@ class GenerateQuestions:
                 # If no code blocks found, use the original text
                 json_text = text_with_json.strip()
 
-            # Use json.loads() to parse the JSON string into a Python object
             dictionary = json.loads(json_text)
             if isinstance(dictionary, dict):
                 return dictionary
             return None
         except json.JSONDecodeError as e:
-            # Handle cases where the string is not valid JSON
             print(f"An error occurred while decoding JSON: {e}")
             return None
 
