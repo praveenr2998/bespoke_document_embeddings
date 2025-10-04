@@ -79,6 +79,7 @@ bespoke_document_embeddings/
    Activate virtual environment in two terminals, one for starting the vLLM server and another one for executing main.py
 
 ## Usage
+Two terminals are required, one for LLM serving and one for executing the pipeling
 
 ### 1. Start vLLM Server
 
